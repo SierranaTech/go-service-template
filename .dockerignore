@@ -1,0 +1,38 @@
+# Keep the build context minimal — everything the Dockerfile doesn't COPY.
+# Faster uploads to the daemon and no accidental secret leaks into layers.
+
+# VCS
+.git
+.gitignore
+.gitattributes
+
+# Local tooling
+.mise.toml
+mise.toml
+.mise/
+.envrc
+.env
+.env.*
+
+# CI / provider config that doesn't belong in the image
+.github/
+renovate.json
+.golangci.yml
+
+# Build outputs and caches
+bin/
+dist/
+*.out
+*.test
+*.coverprofile
+coverage.*
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+
+# Docs — not shipped in the image
+README.md
+CHANGELOG.md
+docs/
