@@ -1,0 +1,91 @@
+[tools]
+go = "1.26.5"
+golangci-lint = "2"
+
+# Granular check/test primitives. Each does one thing and has no `depends`,
+# so `mise run <task>` is safe to invoke in isolation (e.g. from a CI job).
+# `hide = true` keeps them out of `mise tasks` and shell completion —
+# use `mise run test-all` for the aggregate.
+
+[tasks.sync-lint-config]
+description = "Sync .golangci.yml from SierranaTech/actions (canonical)"
+# gh api rather than curl: actions repo is private, so the fetch needs
+# the caller's gh auth (locally) or a GITHUB_TOKEN with contents:read on
+# that repo (CI). See SierranaTech/actions/golangci-lint/README.md.
+# Write to a temp file first: on failure, .golangci.yml is preserved
+# (a naive redirect would clobber it with the 4xx error body).
+run = '''
+set -euo pipefail
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+gh api -H 'Accept: application/vnd.github.raw' \
+  'repos/SierranaTech/actions/contents/golangci-lint/common.yml' > "$tmp"
+mv "$tmp" .golangci.yml
+'''
+
+[tasks.tidy]
+hide = true
+description = "Tidy Go module"
+run = "go mod tidy"
+
+[tasks.fmt]
+hide = true
+description = "Format Go code"
+run = "go fmt ./..."
+
+[tasks.vet]
+hide = true
+description = "Vet Go code"
+run = "go vet ./..."
+
+[tasks.lint]
+hide = true
+description = "Run golangci-lint"
+run = "golangci-lint run ./..."
+
+[tasks.test]
+hide = true
+description = "Run unit tests"
+run = "go test ./... -coverprofile cover.out"
+
+[tasks.e2e]
+description = "End-to-end tests against the built image (placeholder — fill in per service)"
+# CI wires this in as the gate between `build` (which pushes to ECR on main)
+# and `retag` (which promotes to the stable tag fluxcast watches). $IMAGE_TAG
+# is set by the CI job to the tag `build-push-ecr` produced, so a real
+# implementation can `docker pull` and exercise the just-built image.
+#
+# Kept out of `test-all` because e2e is expected to grow expensive (kind
+# clusters, docker run, network); test-all should stay a fast local loop.
+run = 'echo "e2e placeholder — no tests defined yet. Replace this task body with real end-to-end checks. IMAGE_TAG=${IMAGE_TAG:-<not-set-outside-ci>}"'
+
+[tasks.test-all]
+description = "Run the full formatter/linter/test pipeline (fmt, tidy, vet, lint, test)"
+run = '''
+set -euo pipefail
+mise run fmt
+mise run tidy
+mise run vet
+mise run lint
+mise run test
+'''
+
+[tasks.build]
+description = "Build the service binary"
+run = "go build -o bin/app ./cmd"
+sources = ["cmd/**/*.go", "internal/**/*.go", "go.*"]
+outputs = ["bin/app"]
+
+[tasks.run]
+description = "Run the service locally"
+run = "go run ./cmd"
+
+[tasks.docker-build]
+# The Dockerfile is single-stage `COPY bin/app /app` — it does NOT recompile
+# the Go source inside the image. `build` must run first so the binary
+# exists in the build context. In CI this is guaranteed by the docker-push
+# job pulling the binary artifact from `build`; locally, this depends line
+# does the same job.
+depends = ["build"]
+description = "Build the container image (wraps the pre-built ./bin/app binary)"
+run = "docker build -t ${IMG:-REPLACE_ME:latest} ."
