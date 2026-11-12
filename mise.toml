@@ -51,7 +51,7 @@ run = "go test ./... -coverprofile cover.out"
 [tasks.e2e]
 description = "End-to-end tests against the built image (placeholder — fill in per service)"
 # CI wires this in as the gate between `build` (which pushes to ECR on main)
-# and `retag` (which promotes to the stable tag fluxcast watches). $IMAGE_TAG
+# and `retag` (which promotes to the stable tag Flux watches). $IMAGE_TAG
 # is set by the CI job to the tag `build-push-ecr` produced, so a real
 # implementation can `docker pull` and exercise the just-built image.
 #
